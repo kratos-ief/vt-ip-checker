@@ -18,7 +18,20 @@ VirusTotal (plan gratuito) no permite buscar varias IPs en una sola petición, a
 ## Requisitos
 
 - Una API key personal de VirusTotal (se obtiene gratis en tu cuenta de VirusTotal → *API key*).
-- Un navegador moderno. No requiere instalación, Node.js ni servidor.
+- Node.js 18 o superior (sin dependencias adicionales).
+- Un navegador moderno.
+
+## Ejecución local (obligatoria)
+
+VirusTotal no permite consultas directas desde el navegador (no envía cabeceras CORS). Por eso la app incluye un servidor local sin dependencias, [server.js](server.js), que sirve la página y reenvía cada consulta a la API.
+
+```bash
+node server.js
+```
+
+Luego abre **http://127.0.0.1:8080**. El servidor solo escucha en tu equipo y la API key no se guarda en disco.
+
+> La versión publicada en GitHub Pages muestra la interfaz, pero no puede consultar VirusTotal por el bloqueo CORS.
 
 ## Uso
 
@@ -34,6 +47,7 @@ vt-ip-checker/
 ├── index.html   # Interfaz y informe de servicios
 ├── styles.css   # Estilos
 ├── app.js       # Lógica: validación, consultas a la API, filtro y render
+├── server.js    # Servidor local: sirve la app y reenvía las consultas a VirusTotal
 ├── .nojekyll    # Evita que GitHub Pages procese el sitio con Jekyll
 └── README.md
 ```
@@ -50,10 +64,9 @@ Las constantes están al inicio de [app.js](app.js):
 
 ## Despliegue en GitHub Pages
 
-1. Crea un repositorio `vt-ip-checker` en GitHub (público o privado con Pages habilitado).
-2. Sube estos archivos a la rama `main`.
-3. Ve a **Settings → Pages**, elige **Deploy from a branch**, rama `main` y carpeta `/ (root)`.
-4. El sitio quedará disponible en `https://<usuario>.github.io/vt-ip-checker/`.
+1. Repositorio: https://github.com/kratos-ief/vt-ip-checker (rama `main`).
+2. Ve a **Settings → Pages**, elige **Deploy from a branch**, rama `main` y carpeta `/ (root)`.
+3. El sitio quedará en `https://kratos-ief.github.io/vt-ip-checker/` (solo interfaz; para consultar usa `node server.js`).
 
 ## Seguridad y privacidad
 
@@ -64,5 +77,5 @@ Las constantes están al inicio de [app.js](app.js):
 ## Notas
 
 - La cuota gratuita de VirusTotal es de 500 consultas al día; cada IP consume una.
-- Si el navegador bloquea las peticiones por CORS, VirusTotal habrá cambiado su política; en ese caso se necesita un proxy intermedio.
+- Las consultas deben pasar por `server.js`, porque la API de VirusTotal no envía cabeceras CORS.
 - IoC se calcula con los veredictos `malicious` y `suspicious` de `last_analysis_stats`. Una IP que VirusTotal no conoce (HTTP 404) se cuenta como sin problemas.

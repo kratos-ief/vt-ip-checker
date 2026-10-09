@@ -2,7 +2,11 @@
   'use strict';
 
   /* ---------- Configuración ---------- */
-  const VT_API_BASE = 'https://www.virustotal.com/api/v3/ip_addresses/';
+  const IS_LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
+  // En local las consultas pasan por server.js (VirusTotal no admite CORS desde el navegador).
+  const VT_API_BASE = IS_LOCAL
+    ? '/vt/ip/'
+    : 'https://www.virustotal.com/api/v3/ip_addresses/';
   const VT_GUI_BASE = 'https://www.virustotal.com/gui/ip-address/';
   const MAX_IPS = 10;             // máximo de IPs por consulta
   const MIN_IOC = 3;              // "más de 2 IoC" => 3 o más
@@ -102,7 +106,9 @@
       });
     } catch (err) {
       if (err.name === 'AbortError') throw err;
-      throw new VTError('Error de red o bloqueo CORS al contactar VirusTotal.');
+      throw new VTError(IS_LOCAL
+        ? 'No se pudo contactar con el servidor local.'
+        : 'Bloqueo CORS: VirusTotal no permite consultas directas desde el navegador. Ejecuta la app con server.js.');
     }
 
     if (res.status === 404) return { ip, notFound: true, malicious: 0, suspicious: 0, ioc: 0 };
@@ -354,6 +360,9 @@
     loadKey();
     updateInputState();
     renderAll();
+    if (!IS_LOCAL) {
+      setStatus('Esta página no puede consultar VirusTotal directamente (bloqueo CORS). Ejecuta "node server.js" y abre http://127.0.0.1:8080', 'warn');
+    }
 
     ui.ipInput.addEventListener('input', updateInputState);
     ui.startBtn.addEventListener('click', startAnalysis);
