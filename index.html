@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VT IP Checker</title>
+  <meta name="description" content="Consulta por lotes de direcciones IP en VirusTotal y filtra las que tienen más de 2 IoC.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <div class="brand">
+        <span class="logo" aria-hidden="true">IP</span>
+        <div>
+          <h1>VT IP Checker</h1>
+          <p>Consulta por lotes de direcciones IP en VirusTotal</p>
+        </div>
+      </div>
+      <span class="pill">Plan gratuito · 4 solicitudes/min</span>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- 1. Credenciales -->
+    <section class="card">
+      <h2><span class="step">1</span> Credenciales</h2>
+      <label for="apiKey">API key de VirusTotal</label>
+      <div class="row">
+        <input type="password" id="apiKey" autocomplete="off" spellcheck="false" placeholder="Pega tu API key personal">
+        <button type="button" id="toggleKey" class="btn ghost">Mostrar</button>
+      </div>
+      <label class="check">
+        <input type="checkbox" id="rememberKey">
+        Recordar la clave en este navegador
+      </label>
+      <p class="hint">La clave solo se envía a <code>virustotal.com</code>. No se guarda en el repositorio ni en ningún servidor propio.</p>
+    </section>
+
+    <!-- 2. Entrada de IPs -->
+    <section class="card">
+      <h2><span class="step">2</span> Direcciones IP a consultar</h2>
+      <label for="ipInput">Ingresa una IP por línea (también acepta comas o espacios)</label>
+      <textarea id="ipInput" rows="7" spellcheck="false" placeholder="8.8.8.8&#10;1.1.1.1&#10;185.220.101.1"></textarea>
+
+      <div class="meta-row">
+        <span id="ipCount" class="counter">0 / 10 IPs</span>
+        <span class="hint">Límite por consulta: 10 IPs</span>
+      </div>
+
+      <div id="limitAlert" class="alert alert-danger" role="alert" hidden></div>
+      <div id="invalidNote" class="alert alert-warn" hidden></div>
+
+      <div class="actions">
+        <button id="startBtn" type="button" class="btn primary" disabled>Iniciar análisis</button>
+        <button id="cancelBtn" type="button" class="btn danger" hidden>Cancelar</button>
+        <button id="clearBtn" type="button" class="btn ghost">Limpiar</button>
+      </div>
+
+      <div id="progressWrap" class="progress" hidden>
+        <div id="progressBar" class="bar"></div>
+      </div>
+      <p id="statusText" class="status" role="status" aria-live="polite"></p>
+    </section>
+
+    <!-- Indicadores -->
+    <section class="stats" aria-label="Resumen">
+      <div class="stat">
+        <span id="statTotal" class="stat-value">0</span>
+        <span class="stat-label">IPs analizadas</span>
+      </div>
+      <div class="stat stat-danger">
+        <span id="statIssues" class="stat-value">0</span>
+        <span class="stat-label">IPs con problemas (&gt; 2 IoC)</span>
+      </div>
+      <div class="stat stat-ok">
+        <span id="statClean" class="stat-value">0</span>
+        <span class="stat-label">Sin problemas</span>
+      </div>
+      <div class="stat stat-warn">
+        <span id="statErrors" class="stat-value">0</span>
+        <span class="stat-label">Con error de consulta</span>
+      </div>
+    </section>
+
+    <!-- 3. Resultados -->
+    <section class="card">
+      <h2><span class="step">3</span> Resultados: IPs con más de 2 IoC</h2>
+      <p class="hint">IoC = motores que marcan la IP como <em>malicious</em> o <em>suspicious</em>. Ordenado de mayor a menor número de IoC.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Dirección IP</th>
+              <th>IoC</th>
+              <th>Maliciosa</th>
+              <th>Sospechosa</th>
+              <th>Motores</th>
+              <th>País</th>
+              <th>Proveedor (AS)</th>
+              <th>Último análisis</th>
+              <th>Referencia</th>
+            </tr>
+          </thead>
+          <tbody id="resultsBody"></tbody>
+        </table>
+      </div>
+      <p id="resultsEmpty" class="empty">Aún no hay resultados.</p>
+    </section>
+
+    <!-- 4. Errores -->
+    <section id="errorsCard" class="card" hidden>
+      <h2><span class="step">4</span> IPs con error de consulta</h2>
+      <ul id="errorsBody" class="error-list"></ul>
+    </section>
+
+    <!-- 5. Informe de servicios -->
+    <section class="card">
+      <h2><span class="step">5</span> Informe de servicios involucrados</h2>
+      <p class="hint">Servicios que participan en el funcionamiento de la aplicación y función de cada uno.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Servicio</th>
+              <th>Tipo</th>
+              <th>Función dentro de la aplicación</th>
+              <th>Punto de contacto</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>VirusTotal API v3</strong></td>
+              <td>API externa (REST)</td>
+              <td>Devuelve, para cada IP, las estadísticas del último análisis (<code>last_analysis_stats</code>): número de motores que la marcan como maliciosa o sospechosa, país y proveedor de red (AS). Es la fuente de datos de todo el análisis.</td>
+              <td><code>GET /api/v3/ip_addresses/{ip}</code> · cabecera <code>x-apikey</code></td>
+            </tr>
+            <tr>
+              <td><strong>VirusTotal (interfaz web)</strong></td>
+              <td>Portal de referencia</td>
+              <td>Destino del enlace "Ver en VT" de cada IP con problemas, para que el analista revise el detalle, la comunidad y el historial de la IP.</td>
+              <td><code>virustotal.com/gui/ip-address/{ip}</code></td>
+            </tr>
+            <tr>
+              <td><strong>Motores de detección de VirusTotal</strong></td>
+              <td>Fuente de veredictos</td>
+              <td>Proveedores de antivirus y listas de reputación cuyos veredictos se agregan en el conteo de IoC. La aplicación no los consulta directamente; los consume a través de la API.</td>
+              <td>Incluido en la respuesta de la API</td>
+            </tr>
+            <tr>
+              <td><strong>GitHub Pages</strong></td>
+              <td>Hosting estático</td>
+              <td>Publica el sitio (HTML, CSS y JavaScript) a partir del repositorio. No hay backend: todo el procesamiento ocurre en el navegador del usuario.</td>
+              <td>Rama <code>main</code>, carpeta raíz</td>
+            </tr>
+            <tr>
+              <td><strong>GitHub (repositorio)</strong></td>
+              <td>Control de código</td>
+              <td>Almacena el código fuente y el historial de cambios. Es el punto de origen del despliegue en GitHub Pages.</td>
+              <td>Repositorio <code>vt-ip-checker</code></td>
+            </tr>
+            <tr>
+              <td><strong>localStorage del navegador</strong></td>
+              <td>Almacenamiento local</td>
+              <td>Guarda la API key solo si el usuario marca "Recordar la clave". Nunca sale del equipo salvo en las solicitudes a VirusTotal.</td>
+              <td>Clave <code>vtipchecker.apikey</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      VT IP Checker · Los datos provienen de VirusTotal y están sujetos a sus condiciones de uso.
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
